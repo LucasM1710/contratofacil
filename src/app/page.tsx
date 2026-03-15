@@ -72,7 +72,7 @@ export default function Home() {
           {/* Pro */}
           <div style={{ background: '#111', border: '1.5px solid #111', borderRadius: 12, padding: 24, color: '#fff' }}>
             <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Pro</div>
-            <div style={{ fontSize: 30, fontWeight: 500, marginBottom: 16 }}>R$97<span style={{ fontSize: 14, color: '#777' }}>/mês</span></div>
+            <div style={{ fontSize: 30, fontWeight: 500, marginBottom: 16 }}>R$37<span style={{ fontSize: 14, color: '#777' }}>/mês</span></div>
             <ul style={{ listStyle: 'none', padding: 0, marginBottom: 24, color: '#BBB', fontSize: 14 }}>
               {['Ilimitado', 'Prestação de serviço', 'Locação de imóvel', 'Download DOCX', 'Cláusulas extras'].map(f => (
                 <li key={f} style={{ padding: '3px 0' }}>✓ {f}</li>
