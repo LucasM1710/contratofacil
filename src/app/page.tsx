@@ -29,7 +29,7 @@ export default function Home() {
       {/* Hero */}
       <section style={{ maxWidth: 680, margin: '0 auto', padding: '80px 24px', textAlign: 'center' }}>
         <p style={{ fontSize: 12, letterSpacing: 2, textTransform: 'uppercase', color: '#AAA', marginBottom: 16 }}>Powered by Claude AI</p>
-        <h1 style={{ fontSize: 48, fontWeight: 700, lineHeight: 1.15, marginBottom: 20 }}>
+        <h1 style={{ fontSize: 48, fontWeight: 700, lineHeight: 1.15, marginBottom: 20, color: '#AAA' }}>
           Contratos jurídicos<br />em <em style={{ color: '#555', fontStyle: 'italic' }}>segundos</em>
         </h1>
         <p style={{ fontSize: 18, color: '#666', marginBottom: 40, lineHeight: 1.6 }}>
@@ -51,21 +51,21 @@ export default function Home() {
 
       {/* Planos */}
       <section id="planos" style={{ maxWidth: 600, margin: '0 auto', padding: '40px 24px 80px' }}>
-        <h2 style={{ textAlign: 'center', fontSize: 28, fontWeight: 600, marginBottom: 32 }}>Planos</h2>
+        <h2 style={{ textAlign: 'center', fontSize: 28, fontWeight: 600, marginBottom: 32, color: '#AAA' }}>Planos</h2>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           {/* Free */}
           <div style={{ background: '#fff', border: '1.5px solid #E0E0E0', borderRadius: 12, padding: 24 }}>
-            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Free</div>
-            <div style={{ fontSize: 30, fontWeight: 500, marginBottom: 16 }}>R$0<span style={{ fontSize: 14, color: '#999' }}>/mês</span></div>
+            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4, color: '#111' }}>Free</div>
+            <div style={{ fontSize: 30, fontWeight: 500, marginBottom: 16, color: '#111' }}>R$0<span style={{ fontSize: 14, color: '#999' }}>/mês</span></div>
             <ul style={{ listStyle: 'none', padding: 0, marginBottom: 24, color: '#666', fontSize: 14 }}>
               {['3 contratos/mês', 'Prestação de serviço', 'Locação de imóvel'].map(f => (
                 <li key={f} style={{ padding: '3px 0' }}>✓ {f}</li>
               ))}
               {['Download DOCX', 'Cláusulas extras'].map(f => (
-                <li key={f} style={{ padding: '3px 0', color: '#CCC' }}>– {f}</li>
+                <li key={f} style={{ padding: '3px 0', color: '#111' }}>– {f}</li>
               ))}
             </ul>
-            <button onClick={() => router.push('/dashboard')} style={{ width: '100%', background: '#fff', border: '1.5px solid #CCC', padding: '10px 0', borderRadius: 8, cursor: 'pointer', fontWeight: 500 }}>
+            <button onClick={() => router.push('/dashboard')} style={{ width: '100%', background: '#fff', border: '1.5px solid #CCC', padding: '10px 0', borderRadius: 8, cursor: 'pointer', fontWeight: 500, color: '#666' }}>
               Começar grátis
             </button>
           </div>
