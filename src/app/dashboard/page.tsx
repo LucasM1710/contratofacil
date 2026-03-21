@@ -118,6 +118,22 @@ async function assinarPro() {
   }
 }
 
+async function gerenciarAssinatura() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const res = await fetch('/api/stripe/portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: session.user.id })
+    })
+    const data = await res.json()
+    if (data.url) window.location.href = data.url
+  } catch (e) {
+    console.error(e)
+  }
+}
+
   const inp: React.CSSProperties = { fontFamily: 'inherit', fontSize: 14, padding: '11px 13px', border: '1.5px solid #E5E5E5', borderRadius: 8, background: '#fff', color: '#111', width: '100%', boxSizing: 'border-box', outline: 'none' }
   const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 500, color: '#999', textTransform: 'uppercase', letterSpacing: '.4px', display: 'block', marginBottom: 6 }
   const isPro = userData.plano === 'pro'
@@ -153,6 +169,11 @@ async function assinarPro() {
           <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: isPro ? '#111' : '#F2F2F2', color: isPro ? '#fff' : '#666', fontWeight: 600, letterSpacing: '.3px' }}>
             {isPro ? 'PRO ✦' : 'FREE'}
           </span>
+          {isPro && (
+            <button onClick={gerenciarAssinatura} style={{ background: 'transparent', color: '#888', border: '1px solid #E5E5E5', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+              Gerenciar assinatura
+            </button>
+          )}
           <span style={{ fontSize: 13, color: '#AAA' }}>{userData.email}</span>
           <button onClick={sair} style={{ background: 'transparent', color: '#AAA', border: '1px solid #E5E5E5', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
             Sair
