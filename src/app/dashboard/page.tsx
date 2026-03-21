@@ -82,23 +82,41 @@ export default function Dashboard() {
     setTimeout(() => setCopiado(false), 2000)
   }
 
-  async function baixarDocx() {
-    if (userData.plano !== 'pro') { setErro('Download DOCX é exclusivo do plano Pro.'); return }
-    const { Document, Paragraph, TextRun, Packer } = await import('docx')
-    const { saveAs } = await import('file-saver')
-    const linhas = contrato.split('\n')
-    const doc = new Document({
-      sections: [{
-        properties: {},
-        children: linhas.map(linha => new Paragraph({
-          children: [new TextRun({ text: linha, size: 24, font: 'Times New Roman' })],
-          spacing: { after: 120 }
-        }))
-      }]
+async function baixarDocx() {
+  if (userData.plano !== 'pro') { setErro('Download DOCX é exclusivo do plano Pro.'); return }
+  const { Document, Paragraph, TextRun, Packer } = await import('docx')
+  const { saveAs } = await import('file-saver')
+  const linhas = contrato.split('\n')
+  const doc = new Document({
+    sections: [{
+      properties: {},
+      children: linhas.map(linha => new Paragraph({
+        children: [new TextRun({ text: linha, size: 24, font: 'Times New Roman' })],
+        spacing: { after: 120 }
+      }))
+    }]
+  })
+  const blob = await Packer.toBlob(doc)
+  saveAs(blob, `contrato_${tipo}_${Date.now()}.docx`)
+}
+
+async function assinarPro() {
+  setErro('')
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { router.push('/login'); return }
+    const res = await fetch('/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: session.user.id, email: session.user.email })
     })
-    const blob = await Packer.toBlob(doc)
-    saveAs(blob, `contrato_${tipo}_${Date.now()}.docx`)
+    const data = await res.json()
+    if (data.url) window.location.href = data.url
+    else throw new Error('Erro ao redirecionar para o pagamento')
+  } catch (e: unknown) {
+    setErro(e instanceof Error ? e.message : 'Erro ao iniciar pagamento')
   }
+}
 
   const inp: React.CSSProperties = { fontFamily: 'inherit', fontSize: 14, padding: '11px 13px', border: '1.5px solid #E5E5E5', borderRadius: 8, background: '#fff', color: '#111', width: '100%', boxSizing: 'border-box', outline: 'none' }
   const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 500, color: '#999', textTransform: 'uppercase', letterSpacing: '.4px', display: 'block', marginBottom: 6 }
@@ -161,8 +179,8 @@ export default function Dashboard() {
               <div style={{ color: '#fff', fontWeight: 600, fontSize: 15, marginBottom: 4 }}>Limite atingido</div>
               <div style={{ color: '#888', fontSize: 13 }}>Assine o Pro por R$39,99/mês para contratos ilimitados</div>
             </div>
-            <button style={{ background: '#fff', color: '#111', border: 'none', padding: '10px 20px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap' }}>
-              Assinar Pro
+            <button onClick={assinarPro} style={{ background: '#fff', color: '#111', border: 'none', padding: '10px 20px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap' }}>
+              Assinar Pro — R$39,99/mês
             </button>
           </div>
         )}
