@@ -20,6 +20,9 @@ export default function Login() {
       if (modo === 'cadastro') {
         const { error } = await supabase.auth.signUp({ email, password: senha })
         if (error) throw error
+        if (typeof window !== 'undefined' && (window as any).fbq) {
+          (window as any).fbq('track', 'CompleteRegistration')
+        }
         setSucesso('Conta criada! Verifique seu email para confirmar.')
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password: senha })
