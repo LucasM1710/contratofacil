@@ -12,6 +12,32 @@ interface UserData {
   email: string
 }
 
+interface ServicoForm {
+  contratante: string
+  cpf_contratante: string
+  prestador: string
+  cpf_prestador: string
+  servico: string
+  valor: string
+  pagamento: string
+  prazo: string
+  cidade: string
+}
+
+interface LocacaoForm {
+  locador: string
+  cpf_locador: string
+  locatario: string
+  cpf_locatario: string
+  endereco: string
+  tipo_imovel: string
+  valor: string
+  vencimento: string
+  duracao: string
+  indice: string
+  garantia: string
+}
+
 export default function Dashboard() {
   const router = useRouter()
   const [tipo, setTipo] = useState<Tipo>('servico')
@@ -23,15 +49,29 @@ export default function Dashboard() {
   const [copiado, setCopiado] = useState(false)
   const [clausulasExtras, setClausulasExtras] = useState('')
 
-  const [servico, setServico] = useState({ contratante: '', cpf_contratante: '', prestador: '', cpf_prestador: '', servico: '', valor: '', pagamento: '50% no início e 50% na entrega', prazo: '', cidade: '' })
-  const [locacao, setLocacao] = useState({ locador: '', cpf_locador: '', locatario: '', cpf_locatario: '', endereco: '', tipo_imovel: 'residencial', valor: '', vencimento: '', duracao: '12 meses', indice: 'IGPM', garantia: 'caução de 3 meses de aluguel' })
+  const [servico, setServico] = useState<ServicoForm>({
+    contratante: '', cpf_contratante: '', prestador: '', cpf_prestador: '',
+    servico: '', valor: '', pagamento: '50% no início e 50% na entrega', prazo: '', cidade: ''
+  })
+
+  const [locacao, setLocacao] = useState<LocacaoForm>({
+    locador: '', cpf_locador: '', locatario: '', cpf_locatario: '',
+    endereco: '', tipo_imovel: 'residencial', valor: '', vencimento: '',
+    duracao: '12 meses', indice: 'IGPM', garantia: 'caução de 3 meses de aluguel'
+  })
 
   useEffect(() => {
     async function loadUser() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
       const { data } = await supabase.from('users').select('*').eq('id', session.user.id).single()
-      if (data) setUserData({ plano: data.plano, contratos_mes: data.contratos_mes, email: session.user.email || '' })
+      if (data) {
+        setUserData({
+          plano: data.plano,
+          contratos_mes: data.contratos_mes,
+          email: session.user.email || ''
+        })
+      }
       setLoadingUser(false)
     }
     loadUser()
@@ -51,19 +91,23 @@ export default function Dashboard() {
     setErro('')
     setContrato('')
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const dados = tipo === 'servico'
         ? { ...servico, clausulas_extras: userData.plano === 'pro' ? clausulasExtras : '' }
         : locacao
       const res = await fetch('/api/gerar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo, dados })
+        body: JSON.stringify({
+          tipo,
+          dados,
+          userId: session?.user.id,
+          email: session?.user.email
+        })
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setContrato(data.contrato)
-
-      const { data: { session } } = await supabase.auth.getSession()
       if (session) {
         const novoTotal = userData.contratos_mes + 1
         await supabase.from('users').update({ contratos_mes: novoTotal }).eq('id', session.user.id)
@@ -82,60 +126,68 @@ export default function Dashboard() {
     setTimeout(() => setCopiado(false), 2000)
   }
 
-async function baixarDocx() {
-  if (userData.plano !== 'pro') { setErro('Download DOCX é exclusivo do plano Pro.'); return }
-  const { Document, Paragraph, TextRun, Packer } = await import('docx')
-  const { saveAs } = await import('file-saver')
-  const linhas = contrato.split('\n')
-  const doc = new Document({
-    sections: [{
-      properties: {},
-      children: linhas.map(linha => new Paragraph({
-        children: [new TextRun({ text: linha, size: 24, font: 'Times New Roman' })],
-        spacing: { after: 120 }
-      }))
-    }]
-  })
-  const blob = await Packer.toBlob(doc)
-  saveAs(blob, `contrato_${tipo}_${Date.now()}.docx`)
-}
-
-async function assinarPro() {
-  setErro('')
-  try {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { router.push('/login'); return }
-    const res = await fetch('/api/stripe/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: session.user.id, email: session.user.email })
+  async function baixarDocx() {
+    if (userData.plano !== 'pro') { setErro('Download DOCX é exclusivo do plano Pro.'); return }
+    const { Document, Paragraph, TextRun, Packer } = await import('docx')
+    const { saveAs } = await import('file-saver')
+    const linhas = contrato.split('\n')
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: linhas.map(linha => new Paragraph({
+          children: [new TextRun({ text: linha, size: 24, font: 'Times New Roman' })],
+          spacing: { after: 120 }
+        }))
+      }]
     })
-    const data = await res.json()
-    if (data.url) window.location.href = data.url
-    else throw new Error('Erro ao redirecionar para o pagamento')
-  } catch (e: unknown) {
-    setErro(e instanceof Error ? e.message : 'Erro ao iniciar pagamento')
+    const blob = await Packer.toBlob(doc)
+    saveAs(blob, `contrato_${tipo}_${Date.now()}.docx`)
   }
-}
 
-async function gerenciarAssinatura() {
-  try {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-    const res = await fetch('/api/stripe/portal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: session.user.id })
-    })
-    const data = await res.json()
-    if (data.url) window.location.href = data.url
-  } catch (e) {
-    console.error(e)
+  async function assinarPro() {
+    setErro('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/login'); return }
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: session.user.id, email: session.user.email })
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else throw new Error('Erro ao redirecionar para o pagamento')
+    } catch (e: unknown) {
+      setErro(e instanceof Error ? e.message : 'Erro ao iniciar pagamento')
+    }
   }
-}
 
-  const inp: React.CSSProperties = { fontFamily: 'inherit', fontSize: 14, padding: '11px 13px', border: '1.5px solid #E5E5E5', borderRadius: 8, background: '#fff', color: '#111', width: '100%', boxSizing: 'border-box', outline: 'none' }
-  const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 500, color: '#999', textTransform: 'uppercase', letterSpacing: '.4px', display: 'block', marginBottom: 6 }
+  async function gerenciarAssinatura() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const res = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: session.user.id })
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const inp: React.CSSProperties = {
+    fontFamily: 'inherit', fontSize: 14, padding: '11px 13px',
+    border: '1.5px solid #E5E5E5', borderRadius: 8, background: '#fff',
+    color: '#111', width: '100%', boxSizing: 'border-box', outline: 'none'
+  }
+  const lbl: React.CSSProperties = {
+    fontSize: 11, fontWeight: 500, color: '#999',
+    textTransform: 'uppercase', letterSpacing: '.4px', display: 'block', marginBottom: 6
+  }
+
   const isPro = userData.plano === 'pro'
   const restantes = Math.max(0, 3 - userData.contratos_mes)
 
@@ -147,6 +199,7 @@ async function gerenciarAssinatura() {
 
   return (
     <main style={{ fontFamily: 'system-ui, sans-serif', background: '#F7F7F7', minHeight: '100vh', paddingBottom: 80 }}>
+
       {/* Header */}
       <header style={{ background: '#fff', borderBottom: '1px solid #EBEBEB', padding: '14px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -160,7 +213,7 @@ async function gerenciarAssinatura() {
           </svg>
           <span style={{ fontSize: 14, fontWeight: 600, color: '#111' }}>Contrato Fácil</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {!isPro && (
             <span style={{ fontSize: 12, color: '#888' }}>
               {restantes} contrato{restantes !== 1 ? 's' : ''} restante{restantes !== 1 ? 's' : ''}
@@ -182,6 +235,7 @@ async function gerenciarAssinatura() {
       </header>
 
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '40px 24px' }}>
+
         {/* Título */}
         <div style={{ marginBottom: 28 }}>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: '#111', marginBottom: 6, letterSpacing: '-0.5px' }}>Gerar contrato</h1>
@@ -208,25 +262,40 @@ async function gerenciarAssinatura() {
 
         {/* Tipo de contrato */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
-          {([['servico', '💼', 'Prestação de serviço', 'Freelancers, consultores, PJs'], ['locacao', '🏠', 'Locação de imóvel', 'Aluguel residencial ou comercial']] as const).map(([t, icon, title, desc]) => (
-            <div key={t} onClick={() => setTipo(t)} style={{ background: tipo === t ? '#111' : '#fff', color: tipo === t ? '#fff' : '#111', border: `1.5px solid ${tipo === t ? '#111' : '#E5E5E5'}`, borderRadius: 12, padding: '18px 20px', cursor: 'pointer', transition: 'all .15s' }}>
-              <div style={{ fontSize: 20, marginBottom: 8 }}>{icon}</div>
-              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3 }}>{title}</div>
-              <div style={{ fontSize: 12, color: tipo === t ? '#888' : '#AAA' }}>{desc}</div>
-            </div>
-          ))}
+          {(['servico', 'locacao'] as Tipo[]).map((t) => {
+            const icon = t === 'servico' ? '💼' : '🏠'
+            const title = t === 'servico' ? 'Prestação de serviço' : 'Locação de imóvel'
+            const desc = t === 'servico' ? 'Freelancers, consultores, PJs' : 'Aluguel residencial ou comercial'
+            return (
+              <div key={t} onClick={() => setTipo(t)} style={{ background: tipo === t ? '#111' : '#fff', color: tipo === t ? '#fff' : '#111', border: `1.5px solid ${tipo === t ? '#111' : '#E5E5E5'}`, borderRadius: 12, padding: '18px 20px', cursor: 'pointer', transition: 'all .15s' }}>
+                <div style={{ fontSize: 20, marginBottom: 8 }}>{icon}</div>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3 }}>{title}</div>
+                <div style={{ fontSize: 12, color: tipo === t ? '#888' : '#AAA' }}>{desc}</div>
+              </div>
+            )
+          })}
         </div>
 
         {/* Form Serviço */}
         {tipo === 'servico' && (
           <div style={{ background: '#fff', border: '1.5px solid #E5E5E5', borderRadius: 12, padding: 28, marginBottom: 20 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              {([['Contratante (quem paga)', 'contratante', 'Ex: Maria Silva'], ['CPF / CNPJ do contratante', 'cpf_contratante', '000.000.000-00'], ['Prestador (quem executa)', 'prestador', 'Ex: João Dev'], ['CPF / CNPJ do prestador', 'cpf_prestador', '000.000.000-00']] as const).map(([label, field, placeholder]) => (
-                <div key={field}>
-                  <label style={lbl}>{label}</label>
-                  <input style={inp} placeholder={placeholder} value={servico[field]} onChange={e => setServico({ ...servico, [field]: e.target.value })} />
-                </div>
-              ))}
+              <div>
+                <label style={lbl}>Contratante (quem paga)</label>
+                <input style={inp} placeholder="Ex: Maria Silva" value={servico.contratante} onChange={e => setServico({ ...servico, contratante: e.target.value })} />
+              </div>
+              <div>
+                <label style={lbl}>CPF / CNPJ do contratante</label>
+                <input style={inp} placeholder="000.000.000-00" value={servico.cpf_contratante} onChange={e => setServico({ ...servico, cpf_contratante: e.target.value })} />
+              </div>
+              <div>
+                <label style={lbl}>Prestador (quem executa)</label>
+                <input style={inp} placeholder="Ex: João Dev" value={servico.prestador} onChange={e => setServico({ ...servico, prestador: e.target.value })} />
+              </div>
+              <div>
+                <label style={lbl}>CPF / CNPJ do prestador</label>
+                <input style={inp} placeholder="000.000.000-00" value={servico.cpf_prestador} onChange={e => setServico({ ...servico, cpf_prestador: e.target.value })} />
+              </div>
               <div style={{ gridColumn: '1/-1' }}>
                 <label style={lbl}>Descrição do serviço</label>
                 <textarea style={{ ...inp, minHeight: 80, resize: 'vertical' }} placeholder="Ex: Desenvolvimento de site WordPress com 10 páginas, SEO básico e 2h de treinamento." value={servico.servico} onChange={e => setServico({ ...servico, servico: e.target.value })} />
@@ -252,11 +321,12 @@ async function gerenciarAssinatura() {
                 <label style={lbl}>Cidade</label>
                 <input style={inp} placeholder="Ex: São Paulo, SP" value={servico.cidade} onChange={e => setServico({ ...servico, cidade: e.target.value })} />
               </div>
-              {/* Cláusulas extras — só Pro */}
               <div style={{ gridColumn: '1/-1' }}>
                 <label style={{ ...lbl, display: 'flex', alignItems: 'center', gap: 8 }}>
                   Cláusulas extras
-                  {!isPro && <span style={{ background: '#111', color: '#fff', fontSize: 9, padding: '2px 7px', borderRadius: 4, fontWeight: 600, letterSpacing: '.5px' }}>PRO</span>}
+                  {!isPro && (
+                    <span style={{ background: '#111', color: '#fff', fontSize: 9, padding: '2px 7px', borderRadius: 4, fontWeight: 600, letterSpacing: '.5px' }}>PRO</span>
+                  )}
                 </label>
                 <textarea
                   style={{ ...inp, minHeight: 70, resize: 'vertical', opacity: isPro ? 1 : 0.4, cursor: isPro ? 'text' : 'not-allowed' }}
@@ -274,12 +344,22 @@ async function gerenciarAssinatura() {
         {tipo === 'locacao' && (
           <div style={{ background: '#fff', border: '1.5px solid #E5E5E5', borderRadius: 12, padding: 28, marginBottom: 20 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              {([['Locador (proprietário)', 'locador', 'Ex: Carlos Santos'], ['CPF / CNPJ do locador', 'cpf_locador', '000.000.000-00'], ['Locatário (inquilino)', 'locatario', 'Ex: Ana Lima'], ['CPF do locatário', 'cpf_locatario', '000.000.000-00']] as const).map(([label, field, placeholder]) => (
-                <div key={field}>
-                  <label style={lbl}>{label}</label>
-                  <input style={inp} placeholder={placeholder} value={locacao[field]} onChange={e => setLocacao({ ...locacao, [field]: e.target.value })} />
-                </div>
-              ))}
+              <div>
+                <label style={lbl}>Locador (proprietário)</label>
+                <input style={inp} placeholder="Ex: Carlos Santos" value={locacao.locador} onChange={e => setLocacao({ ...locacao, locador: e.target.value })} />
+              </div>
+              <div>
+                <label style={lbl}>CPF / CNPJ do locador</label>
+                <input style={inp} placeholder="000.000.000-00" value={locacao.cpf_locador} onChange={e => setLocacao({ ...locacao, cpf_locador: e.target.value })} />
+              </div>
+              <div>
+                <label style={lbl}>Locatário (inquilino)</label>
+                <input style={inp} placeholder="Ex: Ana Lima" value={locacao.locatario} onChange={e => setLocacao({ ...locacao, locatario: e.target.value })} />
+              </div>
+              <div>
+                <label style={lbl}>CPF do locatário</label>
+                <input style={inp} placeholder="000.000.000-00" value={locacao.cpf_locatario} onChange={e => setLocacao({ ...locacao, cpf_locatario: e.target.value })} />
+              </div>
               <div style={{ gridColumn: '1/-1' }}>
                 <label style={lbl}>Endereço do imóvel</label>
                 <input style={inp} placeholder="Ex: Rua das Flores, 123, Apto 45, Pinheiros, SP" value={locacao.endereco} onChange={e => setLocacao({ ...locacao, endereco: e.target.value })} />
@@ -302,14 +382,18 @@ async function gerenciarAssinatura() {
               <div>
                 <label style={lbl}>Duração</label>
                 <select style={inp} value={locacao.duracao} onChange={e => setLocacao({ ...locacao, duracao: e.target.value })}>
-                  <option>12 meses</option><option>24 meses</option><option>30 meses</option>
+                  <option value="12 meses">12 meses</option>
+                  <option value="24 meses">24 meses</option>
+                  <option value="30 meses">30 meses</option>
                   <option value="indeterminado">Indeterminado</option>
                 </select>
               </div>
               <div>
                 <label style={lbl}>Índice de reajuste</label>
                 <select style={inp} value={locacao.indice} onChange={e => setLocacao({ ...locacao, indice: e.target.value })}>
-                  <option>IGPM</option><option>IPCA</option><option>INPC</option>
+                  <option value="IGPM">IGPM</option>
+                  <option value="IPCA">IPCA</option>
+                  <option value="INPC">INPC</option>
                 </select>
               </div>
               <div>
@@ -327,8 +411,17 @@ async function gerenciarAssinatura() {
 
         {/* Botão gerar */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 28 }}>
-          <button onClick={gerar} disabled={loading || (!isPro && restantes === 0)}
-            style={{ background: loading || (!isPro && restantes === 0) ? '#CCC' : '#111', color: '#fff', border: 'none', padding: '13px 32px', borderRadius: 10, fontSize: 15, fontWeight: 500, cursor: loading || (!isPro && restantes === 0) ? 'not-allowed' : 'pointer', letterSpacing: '-.2px' }}>
+          <button
+            onClick={gerar}
+            disabled={loading || (!isPro && restantes === 0)}
+            style={{
+              background: loading || (!isPro && restantes === 0) ? '#CCC' : '#111',
+              color: '#fff', border: 'none', padding: '13px 32px', borderRadius: 10,
+              fontSize: 15, fontWeight: 500,
+              cursor: loading || (!isPro && restantes === 0) ? 'not-allowed' : 'pointer',
+              letterSpacing: '-.2px'
+            }}
+          >
             {loading ? 'Gerando...' : 'Gerar com IA →'}
           </button>
         </div>
@@ -346,15 +439,23 @@ async function gerenciarAssinatura() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #F0F0F0', flexWrap: 'wrap', gap: 10 }}>
               <div style={{ fontSize: 16, fontWeight: 600, color: '#111' }}>✓ Contrato gerado</div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={copiar} style={{ background: copiado ? '#F0FDF4' : '#F5F5F5', color: copiado ? '#166534' : '#111', border: `1px solid ${copiado ? '#BBF7D0' : '#E5E5E5'}`, padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 500, transition: 'all .2s' }}>
+                <button
+                  onClick={copiar}
+                  style={{ background: copiado ? '#F0FDF4' : '#F5F5F5', color: copiado ? '#166534' : '#111', border: `1px solid ${copiado ? '#BBF7D0' : '#E5E5E5'}`, padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 500, transition: 'all .2s' }}
+                >
                   {copiado ? '✓ Copiado' : 'Copiar'}
                 </button>
-                <button onClick={baixarDocx} style={{ background: isPro ? '#111' : '#F5F5F5', color: isPro ? '#fff' : '#AAA', border: 'none', padding: '8px 16px', borderRadius: 8, cursor: isPro ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button
+                  onClick={baixarDocx}
+                  style={{ background: isPro ? '#111' : '#F5F5F5', color: isPro ? '#fff' : '#AAA', border: 'none', padding: '8px 16px', borderRadius: 8, cursor: isPro ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}
+                >
                   ↓ DOCX {!isPro && <span style={{ fontSize: 9, background: '#DDD', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>PRO</span>}
                 </button>
               </div>
             </div>
-            <pre style={{ fontFamily: 'Georgia, serif', fontSize: 13, lineHeight: 1.95, whiteSpace: 'pre-wrap', color: '#222', margin: 0 }}>{contrato}</pre>
+            <pre style={{ fontFamily: 'Georgia, serif', fontSize: 13, lineHeight: 1.95, whiteSpace: 'pre-wrap', color: '#222', margin: 0 }}>
+              {contrato}
+            </pre>
           </div>
         )}
       </div>
