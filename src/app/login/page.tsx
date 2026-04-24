@@ -23,7 +23,7 @@ export default function Login() {
         if (typeof window !== 'undefined' && (window as any).fbq) {
           (window as any).fbq('track', 'CompleteRegistration')
         }
-        setSucesso('Conta criada! Verifique seu email para confirmar.')
+        setSucesso('Conta criada! Enviamos um link de confirmação para seu email. Verifique sua caixa de entrada e spam.')
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password: senha })
         if (error) throw error
